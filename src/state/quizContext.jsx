@@ -1,32 +1,49 @@
+// src/state/quizContext.jsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 const QuizContext = createContext(null);
 
 const HISTORY_KEY = "quizmaster_history_v1";
+const SETTINGS_KEY = "quizmaster_settings_v1";
 
-function loadHistory() {
+function loadJSON(key, fallback) {
   try {
-    const raw = localStorage.getItem(HISTORY_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
   } catch {
-    return [];
+    return fallback;
   }
 }
 
-function saveHistory(history) {
+function saveJSON(key, value) {
   try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    localStorage.setItem(key, JSON.stringify(value));
   } catch {
     // ignore
   }
 }
 
-export function QuizProvider({ children }) {
-  const [settings, setSettings] = useState({
+function getInitialSettings() {
+  const saved = loadJSON(SETTINGS_KEY, null);
+
+  // default settings
+  const defaults = {
     category: "",
     difficulty: "medium",
     amount: 10,
-  });
+
+    // NEW features
+    darkMode: false,
+    timerEnabled: false,
+    timerSeconds: 20,
+  };
+
+  // merge saved settings safely
+  return saved ? { ...defaults, ...saved } : defaults;
+}
+
+export function QuizProvider({ children }) {
+  const [settings, setSettings] = useState(getInitialSettings);
 
   const [categories, setCategories] = useState([]);
   const [questions, setQuestions] = useState([]);
@@ -41,11 +58,17 @@ export function QuizProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [history, setHistory] = useState(loadHistory);
+  const [history, setHistory] = useState(() => loadJSON(HISTORY_KEY, []));
 
+  // persist history
   useEffect(() => {
-    saveHistory(history);
+    saveJSON(HISTORY_KEY, history);
   }, [history]);
+
+  // persist settings (dark mode / timer / selections)
+  useEffect(() => {
+    saveJSON(SETTINGS_KEY, settings);
+  }, [settings]);
 
   const value = useMemo(
     () => ({
